@@ -3,8 +3,10 @@ import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
-import 'dart:typed_data';
+import 'PlantDetail.dart';
 import 'tflite_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +64,8 @@ class _CameraScreenState extends State<CameraScreen> {
     final ImagePicker picker = ImagePicker();
     XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
+      // Upload gambar ke API Groq
+      //_uploadToGroq(File(pickedFile.path));
       _processImage(File(pickedFile.path));
     }
   }
@@ -73,8 +77,62 @@ class _CameraScreenState extends State<CameraScreen> {
       _image = imageFile;
       predictionResult = prediction;
     });
-  }
 
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PlantDetail(
+          classifiedPlantName: prediction,
+          classifiedImagePath: imageFile.path,
+        ),
+      ),
+    );
+  }
+  final String apiKey = "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";
+
+  Future<void> _uploadToGroq(File imageFile) async {
+    try {
+      // Konversi gambar ke Base64
+      List<int> imageBytes = await imageFile.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+
+      var url = Uri.parse("https://api.groq.com/openai/v1/chat/completions");
+
+      var response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $apiKey",
+        },
+        body: jsonEncode({
+          "model": "llama-3.2-11b-vision-preview", // Model yang mendukung Vision
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {"type": "text", "text": "Apa yang ada dalam gambar ini?"},
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,$base64Image"
+                  }
+                }
+              ]
+            }
+          ]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(response.body);
+        print("Response dari Groq: ${jsonResponse['choices'][0]['message']['content']}");
+      } else {
+        print("Gagal upload gambar: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      print("Error: $e");
+    }
+  }
 
   void _showAboutDialog() {
     showDialog(
@@ -109,48 +167,62 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.green[50],
-      appBar: AppBar(
-        title: Text("Sayurku - Klasifikasi Tanaman",style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: Icon(Icons.info_outline),
-            onPressed: _showAboutDialog,
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Memisahkan bagian tengah dan bawah
+        children: [
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _image != null
+                      ? Image.file(_image!, height: 300, width: 300, fit: BoxFit.cover)
+                      : _cameraController != null && _cameraController!.value.isInitialized
+                      ? SizedBox(height: 566, width: 400, child: CameraPreview(_cameraController!))
+                      : CircularProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text(
+                    predictionResult,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green[800]),
+                  ),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _captureAndPredict,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        ),
+                        icon: Icon(Icons.camera, color: Colors.white),
+                        label: Text("Ambil Foto", style: TextStyle(color: Colors.white)),
+                      ),
+                      SizedBox(width: 20),
+                      ElevatedButton.icon(
+                        onPressed: _pickImage,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[400],
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        ),
+                        icon: Icon(Icons.image, color: Colors.white),
+                        label: Text("Pilih Gambar", style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: Image.asset(
+              'assets/images/sayurku.png',
+              height: 100,
+              width: 100,
+            ),
           ),
         ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _image != null
-                ? Image.file(_image!, height: 300, width: 300, fit: BoxFit.cover)
-                : _cameraController != null && _cameraController!.value.isInitialized
-                ? SizedBox(height: 500, width: 300, child: CameraPreview(_cameraController!))
-                : CircularProgressIndicator(),
-            SizedBox(height: 20),
-            Text(predictionResult, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green[800])),
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _captureAndPredict,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700], padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10)),
-                  icon: Icon(Icons.camera, color: Colors.white),
-                  label: Text("Ambil Foto", style: TextStyle(color: Colors.white)),
-                ),
-                SizedBox(width: 20),
-                ElevatedButton.icon(
-                  onPressed: _pickImage,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green[400], padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10)),
-                  icon: Icon(Icons.image, color: Colors.white),
-                  label: Text("Pilih Gambar", style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

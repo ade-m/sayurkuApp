@@ -34,8 +34,8 @@ class TFLiteService {
     int predictedIndex = outputList.indexOf(outputList.reduce((a, b) => a > b ? a : b));
 
     return predictedIndex >= 0 && predictedIndex < _labels.length
-        ? "✅ Prediksi: ${_labels[predictedIndex]}"
-        : "❌ Prediksi tidak ditemukan";
+        ? "${_labels[predictedIndex]}"
+        : "Tidak dikenali";
   }
 
   /// **Memuat dan Memproses Gambar**
