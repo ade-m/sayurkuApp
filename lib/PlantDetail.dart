@@ -32,7 +32,7 @@ class _PlantDetailState extends State<PlantDetail> {
   }
 
   Future<void> fetchPlantDescription() async {
-    const String apiKey = "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";
+    const String apiKey = "xxx";
     const String apiUrl = "https://api.groq.com/openai/v1/chat/completions";
 
     final response = await http.post(
@@ -61,7 +61,7 @@ class _PlantDetailState extends State<PlantDetail> {
     }
   }
 
-  final String apiKey = "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";
+  final String apiKey = "xxxx";
 
   Future<Map<String, String>> _uploadToGroq(File imageFile) async {
     try {
